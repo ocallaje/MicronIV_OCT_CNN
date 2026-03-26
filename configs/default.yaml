@@ -1,0 +1,72 @@
+# ─────────────────────────────────────────────
+#  OCT Segmentation — Default Configuration
+# ─────────────────────────────────────────────
+
+# ── Paths ────────────────────────────────────
+data:
+  raw_dir:     "data/raw"
+  masks_dir:   "data/masks"
+  splits_dir:  "data/splits"
+  image_ext:   ".tif"           # or ".png"
+  boundary_suffix: "_boundaries.csv"
+
+# ── Image settings ───────────────────────────
+image:
+  height: 512                   # resize target (keeps aspect if null)
+  width:  512
+  um_per_pixel: 1.0             # set to your scanner's scale factor
+                                # e.g. 3.87 µm/pixel axial for Bioptigen
+
+# ── Model ────────────────────────────────────
+model:
+  architecture: "unet"          # unet | unetplusplus
+  encoder:      "resnet34"      # resnet34 | resnet50 | efficientnet-b3
+  encoder_weights: "imagenet"   # imagenet | null (train from scratch)
+  in_channels:  1               # 1 = grayscale OCT
+  num_classes:  1               # 1 = binary ILM-RPE mask
+                                # increase for multi-layer segmentation
+
+# ── Training ─────────────────────────────────
+training:
+  epochs:           100
+  batch_size:       8
+  learning_rate:    1.0e-4
+  weight_decay:     1.0e-5
+  lr_scheduler:     "cosine"    # cosine | plateau | none
+  early_stopping_patience: 15
+  num_workers:      4
+  pin_memory:       true
+
+# ── Loss ─────────────────────────────────────
+loss:
+  dice_weight: 0.5
+  bce_weight:  0.5
+
+# ── Augmentation ─────────────────────────────
+augmentation:
+  horizontal_flip_p:  0.5       # safe for OCT (left-right)
+  vertical_flip_p:    0.0       # DO NOT flip vertically (breaks layer order)
+  brightness_limit:   0.2
+  contrast_limit:     0.2
+  gaussian_noise_p:   0.3
+  elastic_transform_p: 0.3      # simulates tissue deformation
+  random_crop_p:      0.0       # disabled by default
+
+# ── Checkpointing ────────────────────────────
+checkpoint:
+  dir:         "checkpoints"
+  save_top_k:  3
+  monitor:     "val_dice"
+  mode:        "max"
+
+# ── Logging ──────────────────────────────────
+logging:
+  use_wandb:    false
+  project_name: "oct_segmentation"
+  log_images:   true            # log overlay images each epoch
+
+# ── Inference ────────────────────────────────
+inference:
+  threshold:        0.5         # probability threshold for binary mask
+  tta:              false       # test-time augmentation (flip ensemble)
+  output_overlays:  true        # save visual overlays alongside masks
