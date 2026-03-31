@@ -107,15 +107,44 @@ def boundaries_to_multilabel_mask(
 #  File I/O helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+def normalize(col: str) -> str:
+    """Lowercase + remove spaces/underscores for flexible matching."""
+    return col.lower().replace("_", "").replace(" ", "")
+
 def load_boundary_csv(csv_path: Path) -> pd.DataFrame:
     """Load boundary coordinates. Expects columns: x, ilm_y, rpe_y (+ more)."""
-    df = pd.read_csv(csv_path)
-    required = {"x", "ilm_y", "rpe_y"}
-    missing = required - set(df.columns)
-    if missing:
-        raise ValueError(f"{csv_path.name}: missing columns {missing}")
-    return df.sort_values("x").reset_index(drop=True)
+    df = pd.read_csv(csv_path, sep=None, engine="python")  # auto-detect delimiter
+    
+    # Build normalized lookup
+    norm_cols = {normalize(c): c for c in df.columns}
+    aliases = {
+        "x": ["x"],
+        "ilm": ["ilmy", "ilm", "infl", "nfl"],
+        "rpe": ["rpey", "rpe"],
+    }
 
+    resolved = {}
+
+    for target, options in aliases.items():
+        found = None
+        for opt in options:
+            if opt in norm_cols:
+                found = norm_cols[opt]
+                break
+        if found is None:
+            raise ValueError(
+                f"{csv_path.name}: missing column for '{target}' (tried {options})"
+            )
+        resolved[target] = found
+
+    # Rename to standard names
+    df = df.rename(columns={
+        resolved["x"]: "x",
+        resolved["ilm"]: "ilm",
+        resolved["rpe"]: "rpe",
+    })
+
+    return df.sort_values("x").reset_index(drop=True)
 
 def get_image_shape(image_path: Path) -> tuple[int, int]:
     """Return (H, W) of an image without fully loading it."""
@@ -147,11 +176,11 @@ def process_one(
         )
         old_x = df["x"].values
         new_x = np.arange(W)
-        ilm_y = np.interp(new_x, old_x, df["ilm_y"].values)
-        rpe_y = np.interp(new_x, old_x, df["rpe_y"].values)
+        ilm_y = np.interp(new_x, old_x, df["ilm"].values)
+        rpe_y = np.interp(new_x, old_x, df["rpe"].values)
     else:
-        ilm_y = df["ilm_y"].values
-        rpe_y = df["rpe_y"].values
+        ilm_y = df["ilm"].values
+        rpe_y = df["rpe"].values
 
     mask = boundaries_to_binary_mask((H, W), ilm_y, rpe_y)
 
@@ -170,14 +199,14 @@ def process_dataset(
     raw_dir: Path,
     output_dir: Path,
     image_ext: str = ".tif",
-    boundary_suffix: str = "_boundaries.csv",
+    boundary_suffix: str = "_layers.csv",
 ) -> None:
     """
     Walk raw_dir, find all images, generate corresponding masks.
 
     Expects pairs:
         <animal_id>/image_001.tif
-        <animal_id>/image_001_boundaries.csv
+        <animal_id>/image_001_layers.csv
     """
     output_dir.mkdir(parents=True, exist_ok=True)
     image_paths = sorted(raw_dir.rglob(f"*{image_ext}"))
@@ -190,12 +219,17 @@ def process_dataset(
     success, skipped = 0, 0
 
     for img_path in tqdm(image_paths, desc="Generating masks"):
-        boundary_path = img_path.with_name(img_path.stem + boundary_suffix)
+        # ignore fundus images
+        if is_fundus(img_path):
+            continue
 
+        boundary_path = img_path.with_name(img_path.stem + boundary_suffix)
         if not boundary_path.exists():
             log.warning(f"No boundary file for {img_path.name} — skipping.")
             skipped += 1
             continue
+
+        
 
         # Mirror the subdirectory structure under output_dir
         rel_dir = img_path.parent.relative_to(raw_dir)
@@ -207,10 +241,14 @@ def process_dataset(
             log.debug(f"Saved mask → {out_path}")
             success += 1
         except Exception as e:
-            log.error(f"Failed on {img_path.name}: {e}")
+            log.error(f"Failed on {img_path.parent.name}/{img_path.name}: {e}")
             skipped += 1
 
     log.info(f"Done — {success} masks saved, {skipped} skipped.")
+
+
+def is_fundus(path: Path) -> bool:
+    return path.stem.lower().endswith("fundus")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -224,7 +262,7 @@ def parse_args():
     p.add_argument("--image_ext", default=".tif",            help="Image extension")
     p.add_argument(
         "--boundary_suffix",
-        default="_boundaries.csv",
+        default="_layers.csv",
         help="Suffix appended to image stem to find boundary CSV",
     )
     return p.parse_args()

@@ -4,11 +4,11 @@
 
 # ── Paths ────────────────────────────────────
 data:
-  raw_dir:     "data/raw"
-  masks_dir:   "data/masks"
-  splits_dir:  "data/splits"
+  raw_dir:     "/mnt/AI/OCT_seg_micron/data/raw"
+  masks_dir:   "/mnt/AI/OCT_seg_micron/data/masks"
+  splits_dir:  "/mnt/AI/OCT_seg_micron/data/splits"
   image_ext:   ".tif"           # or ".png"
-  boundary_suffix: "_boundaries.csv"
+  boundary_suffix: "_layers.csv"
 
 # ── Image settings ───────────────────────────
 image:

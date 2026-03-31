@@ -13,7 +13,8 @@ Handles:
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
-from torchmetrics import Dice, JaccardIndex
+from torchmetrics.segmentation import DiceScore
+from torchmetrics.classification import JaccardIndex
 
 from src.models.unet import build_model
 from src.training.losses import CombinedLoss
@@ -36,8 +37,8 @@ class OCTSegmentationModule(pl.LightningModule):
         )
 
         # Metrics (torchmetrics handles batching correctly)
-        self.train_dice = Dice(threshold=0.5)
-        self.val_dice   = Dice(threshold=0.5)
+        self.train_dice = DiceScore(num_classes=2, include_background=False, average="macro")
+        self.val_dice   = DiceScore(num_classes=2, include_background=False, average="macro")
         self.val_iou    = JaccardIndex(task="binary", threshold=0.5)
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -61,15 +62,37 @@ class OCTSegmentationModule(pl.LightningModule):
 
     def training_step(self, batch: dict, batch_idx: int) -> torch.Tensor:
         loss, probs, masks = self._shared_step(batch)
-        self.train_dice(probs, masks.int())
+
+        # DiceScore needs: preds (B, num_classes, H, W) one-hot, target (B, H, W) long
+        preds_onehot = self._to_onehot(probs)          # (B, 2, H, W)
+        target_onehot = self._mask_to_onehot(masks)
+
+        self.train_dice(preds_onehot, target_onehot)
 
         self.log("train_loss", loss,            on_step=False, on_epoch=True, prog_bar=True)
         self.log("train_dice", self.train_dice, on_step=False, on_epoch=True, prog_bar=True)
         return loss
 
+    def _to_onehot(self, probs: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
+        """Convert (B, 1, H, W) sigmoid probs → (B, 2, H, W) one-hot."""
+        fg = (probs[:, 0] > threshold).long()  # (B, H, W)
+        bg = 1 - fg
+        return torch.stack([bg, fg], dim=1).float()
+    
+    def _mask_to_onehot(self, masks: torch.Tensor) -> torch.Tensor:
+        """Convert (B, 1, H, W) float mask → (B, 2, H, W) one-hot."""
+        fg = masks[:, 0].long()   # (B, H, W)
+        bg = 1 - fg
+        return torch.stack([bg, fg], dim=1).float()
+
     def validation_step(self, batch: dict, batch_idx: int) -> None:
         loss, probs, masks = self._shared_step(batch)
-        self.val_dice(probs, masks.int())
+
+        #self.val_dice(probs, masks.int())
+        preds_onehot = self._to_onehot(probs)          # (B, 2, H, W)
+        target_onehot = self._mask_to_onehot(masks)            # (B, H, W)
+
+        self.val_dice(preds_onehot, target_onehot)
         self.val_iou(probs,  masks.int())
 
         self.log("val_loss", loss,          on_step=False, on_epoch=True, prog_bar=True)

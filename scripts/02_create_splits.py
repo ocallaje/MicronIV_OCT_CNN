@@ -60,6 +60,10 @@ def main():
     # ── Discover all (image, mask) pairs ─────────────────────────────────────
     records = []
     for img_path in sorted(args.raw_dir.rglob(f"*{image_ext}")):
+        # Skip fundus images
+        if is_fundus(img_path):
+            continue
+
         animal_id = img_path.parent.name  # assumes <raw_dir>/<animal_id>/<image>
         mask_path = args.mask_dir / img_path.parent.relative_to(args.raw_dir) \
                     / (img_path.stem + "_mask.png")
@@ -113,6 +117,10 @@ def main():
     print(f"  Val   : {len(val_df):4d} images | {len(val_animals)}  animals: {val_animals}")
     print(f"  Test  : {len(test_df):4d} images | {len(test_animals)}  animals: {test_animals}")
     print(f"\nSaved splits → {args.output_dir}/")
+
+
+def is_fundus(path: Path) -> bool:
+    return "fundus" in path.stem.lower()
 
 
 if __name__ == "__main__":

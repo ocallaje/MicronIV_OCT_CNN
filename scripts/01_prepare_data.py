@@ -22,8 +22,8 @@ from src.data.prepare_masks import process_dataset
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--data_dir",   type=Path, required=True)
-    p.add_argument("--output_dir", type=Path, required=True)
+    p.add_argument("--data_dir",   type=Path, default="/mnt/AI/OCT_seg_micron/data/raw")
+    p.add_argument("--output_dir", type=Path, default="/mnt/AI/OCT_seg_micron/data/masks")
     p.add_argument("--config",     type=Path, default="configs/default.yaml")
     return p.parse_args()
 

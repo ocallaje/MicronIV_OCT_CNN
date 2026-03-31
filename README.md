@@ -95,25 +95,25 @@ x,ilm_y,rpe_y
 ### 3. Generate masks
 
 ```bash
-python scripts/01_prepare_data.py --data_dir data/raw --output_dir data/masks
+python3 scripts/01_prepare_data.py --data_dir data/raw --output_dir data/masks
 ```
 
 ### 4. Create splits
 
 ```bash
-python scripts/02_create_splits.py --data_dir data/raw --output_dir data/splits
+python3 scripts/02_create_splits.py --data_dir data/raw --output_dir data/splits
 ```
 
 ### 5. Train
 
 ```bash
-python scripts/03_train.py --config configs/default.yaml
+python3 scripts/03_train.py --config configs/default.yaml --gpus 1
 ```
 
 ### 6. Predict on new images
 
 ```bash
-python scripts/04_evaluate.py \
+python3 scripts/04_evaluate.py \
     --checkpoint checkpoints/best_model.ckpt \
     --image path/to/new_oct.tif \
     --output results/

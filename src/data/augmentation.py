@@ -25,6 +25,7 @@ def get_train_transforms(image_size: tuple[int, int], aug_cfg: dict) -> A.Compos
     aug_cfg    : augmentation section from config YAML
     """
     H, W = image_size
+
     return A.Compose(
         [
             # ── Spatial ────────────────────────────────────────────────────
