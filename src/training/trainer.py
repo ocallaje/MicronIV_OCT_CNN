@@ -34,6 +34,7 @@ class OCTSegmentationModule(pl.LightningModule):
         self.criterion = CombinedLoss(
             dice_weight=loss_cfg["dice_weight"],
             bce_weight=loss_cfg["bce_weight"],
+            fp_weight=loss_cfg["fp_weight"],
         )
 
         # Metrics (torchmetrics handles batching correctly)

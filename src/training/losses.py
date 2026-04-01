@@ -38,7 +38,30 @@ class DiceLoss(nn.Module):
         )
         return 1.0 - dice.mean()
 
+class AsymmetricBCE(nn.Module):
+    """
+    Penalise false positives (predicting mask where there is none) 
+    more heavily than false negatives. Corrects upward ILM bias.
 
+    fp_weight > 1.0 = penalise over-prediction (too wide/high)
+    fn_weight > 1.0 = penalise under-prediction (too narrow)
+    """
+    def __init__(self, fp_weight=2.0, fn_weight=1.0):
+        super().__init__()
+        self.fp_weight = fp_weight
+        self.fn_weight = fn_weight
+
+    def forward(self, logits, targets):
+        probs = torch.sigmoid(logits)
+        
+        # False positive: predicted 1, truth is 0 (over-prediction)
+        fp_loss = -targets * torch.log(probs + 1e-6)
+        # False negative: predicted 0, truth is 1 (under-prediction)  
+        fn_loss = -(1 - targets) * torch.log(1 - probs + 1e-6)
+
+        loss = self.fn_weight * fp_loss + self.fp_weight * fn_loss
+        return loss.mean()
+    
 class CombinedLoss(nn.Module):
     """
     Weighted sum of Dice loss and Binary Cross-Entropy loss.
@@ -49,12 +72,13 @@ class CombinedLoss(nn.Module):
     bce_weight  : float  (default 0.5)
     """
 
-    def __init__(self, dice_weight: float = 0.5, bce_weight: float = 0.5):
+    def __init__(self, dice_weight: float = 0.5, bce_weight: float = 0.5, fp_weight=2.0):
         super().__init__()
         self.dice_weight = dice_weight
         self.bce_weight  = bce_weight
         self.dice_loss   = DiceLoss()
-        self.bce_loss    = nn.BCEWithLogitsLoss()
+        #self.bce_loss    = nn.BCEWithLogitsLoss()
+        self.bce_loss    = AsymmetricBCE(fp_weight=fp_weight, fn_weight=1.0)
 
     def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         dice = self.dice_loss(logits, targets)

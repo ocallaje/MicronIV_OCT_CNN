@@ -41,6 +41,7 @@ training:
 loss:
   dice_weight: 0.5
   bce_weight:  0.5
+  fp_weight:   2.0
 
 # ── Augmentation ─────────────────────────────
 augmentation:
