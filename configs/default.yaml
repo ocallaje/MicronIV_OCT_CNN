@@ -12,8 +12,8 @@ data:
 
 # ── Image settings ───────────────────────────
 image:
-  height: 512                   # resize target (keeps aspect if null)
-  width:  512
+  height: 768                   # resize target (keeps aspect if null)
+  width:  768
   um_per_pixel: 1.0             # set to your scanner's scale factor
                                 # e.g. 3.87 µm/pixel axial for Bioptigen
 
